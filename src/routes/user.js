@@ -29,7 +29,46 @@ router.get('/:id', (req, res) => {
     });
 });
 
-
+router.use('/', auth((token, params) => {
+    return true;
+}));
+router.get('/', (req, res) => {
+    if (!req.header('radius')) return res.status(400).json({
+        "error": {
+            "radius": "notspecified"
+        }
+    });
+    var radius = req.header('radius');
+    var token = jwt.decode(req.header('auth_token'));
+    db.query("SELECT * FROM users WHERE id=?", [token._id], (err, result) => {
+        result = JSON.parse(JSON.stringify(result))[0];
+        if (result == undefined || result.length == 0) return res.status(400).json({
+            "error": {
+                "auth": {
+                    "id": "invalid"
+                }
+            }
+        });
+        var sql_params = [result.loc_n - radius / 100, result.loc_n + radius / 100, result.loc_e - radius / 100, result.loc_e + radius / 100];
+        db.query("SELECT * FROM users WHERE loc_n BETWEEN ? AND ? AND loc_e BETWEEN ? AND ?", sql_params, (err, result) => {
+            var users = [];
+            for (user of result) {
+                users.push({
+                    "id":user.id,
+                    "name": user.name,
+                    "loc": {
+                        "n": user.loc_n,
+                        "e": user.loc_e
+                    }
+                });
+            }
+            res.json({
+                "users": users
+            })
+            console.log(result);
+        });
+    });
+});
 
 
 
